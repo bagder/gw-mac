@@ -36,6 +36,7 @@ void getarp(uint32_t ip)
           uint32_t searchip = p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
           if(ip == searchip) {
             printf("id: %s\n", hw);
+            break;
           }
         }
       }
