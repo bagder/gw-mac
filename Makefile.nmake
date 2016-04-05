@@ -2,11 +2,10 @@ TARGET = netid
 
 OBJS = netid-win.obj
 
-LIBS = ws2_32.lib
+LIBS = ws2_32.lib Iphlpapi.lib 
 
 $(TARGET): $(OBJS)
-	link /incremental:no /nologo /subsystem:console /machine:x86 /out:$(TARGET) ws2_32.lib Iphlpapi.lib $(OBJS)
+	link /incremental:no /nologo /subsystem:console /machine:x86 /out:$(TARGET) $(LIBS) $(OBJS)
 
 netid-win.obj:netid-win.c
         $(CC) netid-win.c
-
