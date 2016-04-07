@@ -1,2 +1,2 @@
 # gw-mac
-Figure out MAC address of default gateway
+Figures out the MAC address of default gateway. On Linux, Windows and Mac OS X.
