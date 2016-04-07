@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 
 #ifndef SA_SIZE
 #define SA_SIZE(sa)                                                     \
@@ -32,26 +32,32 @@ print_lladdr(struct sockaddr_dl *sdl)
   char *cp;
   int n, bufsize = sizeof (buf), p = 0;
 
-  memset(buf, 0, sizeof (buf));
+  buf[0] = 0;
   cp = (char *)LLADDR(sdl);
-  if ((n = sdl->sdl_alen) > 0) {
+  n = sdl->sdl_alen;
+  if (n > 0) {
     while (--n >= 0)
-      p += snprintf(buf + p, bufsize - p, "%x%s",
+      p += snprintf(&buf[p], bufsize - p, "%02x%s",
                     *cp++ & 0xff, n > 0 ? ":" : "");
   }
-  return (buf);
+  return buf;
 }
 
-static void
-print_arp(struct sockaddr_dl *sdl,
-          struct sockaddr_inarp *addr, struct rt_msghdr *rtm)
+static int show(struct sockaddr_dl *sdl,
+                struct sockaddr_inarp *addr,
+                struct rt_msghdr *rtm,
+                char *ip)
 {
   if (sdl->sdl_alen) {
-    printf("%s %s\n", print_lladdr(sdl), inet_ntoa(addr->sin_addr));
+    if(!strcmp(inet_ntoa(addr->sin_addr), ip)) {
+      printf("id: %s\n", print_lladdr(sdl));
+      return 1; /* done! */
+    }
   }
+  return 0; /* continue */
 }
 
-static int listarp(void)
+static int getarp(char *ip)
 {
   int mib[6];
   size_t needed;
@@ -90,16 +96,57 @@ static int listarp(void)
     sin2 = (struct sockaddr_inarp *)(rtm + 1);
     sdl = (struct sockaddr_dl *)((char *)sin2 + SA_SIZE(sin2));
 
-    print_arp(sdl, sin2, rtm);
+    if(show(sdl, sin2, rtm, ip))
+      break;
   }
   free(buf);
   return 0;
 }
 
-int
-main(int argc, char *argv[])
+
+static void routingtable(char *gw)
 {
-  listarp();
+  size_t needed;
+  int mib[6];
+  char *buf, *next, *lim;
+  struct rt_msghdr *rtm;
+  struct sockaddr *sa;
+  struct sockaddr_in *sockin;
+
+  mib[0] = CTL_NET;
+  mib[1] = PF_ROUTE;
+  mib[2] = 0;
+  mib[3] = 0;
+  mib[4] = NET_RT_DUMP;
+  mib[5] = 0;
+  if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0) {
+    err(1, "sysctl: net.route.0.0.dump estimate");
+  }
+
+  if ((buf = (char *)malloc(needed)) == NULL) {
+    errx(2, "malloc(%lu)", (unsigned long)needed);
+  }
+  if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
+    err(1, "sysctl: net.route.0.0.dump");
+  }
+  lim  = buf + needed;
+  for (next = buf; next < lim; next += rtm->rtm_msglen) {
+    rtm = (struct rt_msghdr *)next;
+    sa = (struct sockaddr *)(rtm + 1);
+    sa = (struct sockaddr *)(SA_SIZE(sa) + (char *)sa);
+    sockin = (struct sockaddr_in *)sa;
+    inet_ntop(AF_INET, &sockin->sin_addr.s_addr, gw, MAXHOSTNAMELEN-1);
+    break;
+  }
+
+  free(buf);
+}
+
+int main(void)
+{
+  char defaultgw[MAXHOSTNAMELEN];
+  routingtable(defaultgw);
+  getarp(defaultgw);
 
   return 0;
 }
