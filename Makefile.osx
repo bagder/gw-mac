@@ -1,0 +1,7 @@
+TARGET = netid-osx
+
+CFLAGS = -Wall
+
+OBJS = netid-osx.o
+
+$(TARGET): $(OBJS)
