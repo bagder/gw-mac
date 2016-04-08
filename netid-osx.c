@@ -108,7 +108,7 @@ static void routingtable(char *gw)
 {
   size_t needed;
   int mib[6];
-  char *buf, *lim;
+  char *buf;
   struct rt_msghdr *rtm;
   struct sockaddr *sa;
   struct sockaddr_in *sockin;
@@ -129,7 +129,6 @@ static void routingtable(char *gw)
   if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
     err(1, "sysctl: net.route.0.0.dump");
   }
-  lim  = buf + needed;
 
   rtm = (struct rt_msghdr *)buf;
   sa = (struct sockaddr *)(rtm + 1);
