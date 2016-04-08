@@ -108,7 +108,7 @@ static void routingtable(char *gw)
 {
   size_t needed;
   int mib[6];
-  char *buf, *next, *lim;
+  char *buf, *lim;
   struct rt_msghdr *rtm;
   struct sockaddr *sa;
   struct sockaddr_in *sockin;
@@ -130,14 +130,12 @@ static void routingtable(char *gw)
     err(1, "sysctl: net.route.0.0.dump");
   }
   lim  = buf + needed;
-  for (next = buf; next < lim; next += rtm->rtm_msglen) {
-    rtm = (struct rt_msghdr *)next;
-    sa = (struct sockaddr *)(rtm + 1);
-    sa = (struct sockaddr *)(SA_SIZE(sa) + (char *)sa);
-    sockin = (struct sockaddr_in *)sa;
-    inet_ntop(AF_INET, &sockin->sin_addr.s_addr, gw, MAXHOSTNAMELEN-1);
-    break;
-  }
+
+  rtm = (struct rt_msghdr *)buf;
+  sa = (struct sockaddr *)(rtm + 1);
+  sa = (struct sockaddr *)(SA_SIZE(sa) + (char *)sa);
+  sockin = (struct sockaddr_in *)sa;
+  inet_ntop(AF_INET, &sockin->sin_addr.s_addr, gw, MAXHOSTNAMELEN-1);
 
   free(buf);
 }
