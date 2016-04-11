@@ -24,7 +24,7 @@ static BOOL macaddr(BYTE addr[], DWORD len, char str[])
   return TRUE;
 }
 
-void arplist(char *gateway)
+static void arplist(char *gateway)
 {
   PMIB_IPNETTABLE pIpNetTable = NULL;
 
@@ -70,71 +70,7 @@ void arplist(char *gateway)
   }
 }
 
-int adapterlist(void)
-{
-  PIP_ADAPTER_INFO pAdapterInfo;
-  PIP_ADAPTER_INFO pAdapter = NULL;
-  DWORD dwRetVal = 0;
-  UINT i;
-
-  /* variables used to print DHCP time info */
-  struct tm newtime;
-  char buffer[32];
-  errno_t error;
-
-  ULONG ulOutBufLen = sizeof (IP_ADAPTER_INFO);
-  pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof (IP_ADAPTER_INFO));
-  if (pAdapterInfo == NULL) {
-    printf("Error allocating memory needed to call GetAdaptersinfo\n");
-    return 1;
-  }
-  /* Make an initial call to GetAdaptersInfo to get the necessary size into
-     the ulOutBufLen variable */
-  if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW) {
-    free(pAdapterInfo);
-    pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
-    if (pAdapterInfo == NULL) {
-      printf("Error allocating memory needed to call GetAdaptersinfo\n");
-      return 1;
-    }
-  }
-
-  if ((dwRetVal = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen)) == NO_ERROR) {
-    pAdapter = pAdapterInfo;
-    while (pAdapter) {
-#if 0
-      printf("ComboIndex: \t%d\n", pAdapter->ComboIndex);
-      printf("Adapter Name: \t%s\n", pAdapter->AdapterName);
-      printf("Adapter Desc: \t%s\n", pAdapter->Description);
-      printf("Adapter Addr: \t");
-      for (i = 0; i < pAdapter->AddressLength; i++) {
-        if (i == (pAdapter->AddressLength - 1))
-          printf("%.2X\n", (int) pAdapter->Address[i]);
-        else
-          printf("%.2X-", (int) pAdapter->Address[i]);
-      }
-      printf("Index: \t%d\n", pAdapter->Index);
-
-      printf("IP Address: \t%s\n",
-             pAdapter->IpAddressList.IpAddress.String);
-      printf("IP Mask: \t%s\n", pAdapter->IpAddressList.IpMask.String);
-#endif
-
-      printf("Gateway: \t%s\n", pAdapter->GatewayList.IpAddress.String);
-
-      pAdapter = pAdapter->Next;
-    }
-  } else {
-    printf("GetAdaptersInfo failed with error: %d\n", dwRetVal);
-
-  }
-  if (pAdapterInfo)
-    free(pAdapterInfo);
-
-  return 0;
-}
-
-int defaultgw(char *gateway) /* at least 128 bytes buffer */
+static int defaultgw(char *gateway) /* at least 128 bytes buffer */
 {
   /* variables used for GetIfForwardTable */
   PMIB_IPFORWARDTABLE pIpForwardTable;
