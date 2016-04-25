@@ -17,9 +17,8 @@ static BOOL macaddr(BYTE addr[], DWORD len, char str[])
     return FALSE;
 
   for (i = 0; i < len; i++)
-    sprintf_s(str+(i*3), sizeof(str+(i*3)),
-              "%02x%s", ((int)addr[i])&0xff,
-              (i==len-1)?"":":");
+    sprintf_s(str + (i * 3), sizeof(str + (i * 3)),
+              "%02x%s", addr[i], (i == len-1) ? "": ":");
 
   return TRUE;
 }
