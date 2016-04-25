@@ -72,7 +72,7 @@ static void arplist(char *gateway)
 static int defaultgw(char *gateway) /* at least 128 bytes buffer */
 {
   /* variables used for GetIfForwardTable */
-  PMIB_IPFORWARDTABLE pIpForwardTable;
+  PMIB_IPFORWARDTABLE pIpForwardTable = NULL;
   DWORD dwSize = 0;
   DWORD dwRetVal = 0;
 
@@ -81,18 +81,10 @@ static int defaultgw(char *gateway) /* at least 128 bytes buffer */
   struct in_addr IpAddr;
   int i;
 
-  pIpForwardTable =
-    (MIB_IPFORWARDTABLE *)malloc(sizeof (MIB_IPFORWARDTABLE));
-  if (pIpForwardTable == NULL) {
-    printf("Error allocating memory\n");
-    return 1;
-  }
-
-  if (GetIpForwardTable(pIpForwardTable, &dwSize, 0) ==
+  if (GetIpForwardTable(NULL, &dwSize, 0) ==
       ERROR_INSUFFICIENT_BUFFER) {
-    free(pIpForwardTable);
     pIpForwardTable = (MIB_IPFORWARDTABLE *)malloc(dwSize);
-    if (pIpForwardTable == NULL) {
+    if (!pIpForwardTable) {
       printf("Error allocating memory\n");
       return 1;
     }
