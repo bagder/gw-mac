@@ -6,9 +6,11 @@
 
 #define PROC_ROUTE "/proc/net/route"
 #define PROC_ARP   "/proc/net/arp"
+#define PROC_IF_INET6 "/proc/net/if_inet6"
 
-void getarp(uint32_t ip)
+int getarp(uint32_t ip)
 {
+  int found = 1;
   char searchfor[16];
   sprintf(searchfor, "%d.%d.%d.%d",
           ip & 0xff,
@@ -36,6 +38,7 @@ void getarp(uint32_t ip)
           uint32_t searchip = p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
           if(ip == searchip) {
             printf("id: %s\n", hw);
+            found = 0;
             break;
           }
         }
@@ -43,6 +46,7 @@ void getarp(uint32_t ip)
     }
     fclose(farp);
   }
+  return found;
 }
 
 uint32_t getroute(void)
@@ -76,8 +80,69 @@ uint32_t getroute(void)
   return gw;
 }
 
+void getprefix(void)
+{
+  FILE *ifs = fopen(PROC_IF_INET6, "r");
+  if (ifs) {
+    char buffer[512];
+    char ip6[40];
+    int devnum;
+    int preflen;
+    int scope;
+    int flags;
+    char name[40];
+
+    char *l = fgets(buffer, sizeof(buffer), ifs);
+    /* 2a001a28120000090000000000000002 02 40 00 80   eth0 */
+    /* +------------------------------+ ++ ++ ++ ++   ++
+     * |                                |  |  |  |    |
+     * 1                                2  3  4  5    6
+     *
+     * 1. IPv6 address displayed in 32 hexadecimal chars without colons as
+     *    separator
+     *
+     * 2. Netlink device number (interface index) in hexadecimal.
+     *
+     * 3. Prefix length in hexadecimal number of bits
+     *
+     * 4. Scope value (see kernel source include/net/ipv6.h and
+     *    net/ipv6/addrconf.c for more)
+     *
+     * 5. Interface flags (see include/linux/rtnetlink.h and net/ipv6/addrconf.c
+     *    for more)
+     *
+     * 6. Device name
+     */
+    while(l) {
+      if(6 == sscanf(buffer, "%32[0-9a-f] %02x %02x %02x %02x %31s",
+                     ip6, &devnum, &preflen, &scope, &flags, name)) {
+        printf("%s matched, scope = %d\n", name, scope);
+      }
+
+      l = fgets(buffer, sizeof(buffer), ifs);
+    }
+    fclose(ifs);
+  }
+
+}
+
 int main(void)
 {
   uint32_t gw = getroute();
-  getarp(gw);
+  int rc = 0;
+  if(gw) {
+    if(getarp(gw)) {
+      puts("gw not in ARP table");
+      rc = 1;
+    }
+  }
+  else {
+    puts("default gateway not found");
+    rc = 2;
+  }
+
+  if(1) {
+    /* IPv4 check failed, check IPv6 global scope net prefix */
+    getprefix();
+  }
 }
