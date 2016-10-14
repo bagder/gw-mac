@@ -81,7 +81,7 @@ uint32_t getroute(void)
   return gw;
 }
 
-#define GLOBAL 0x20 /* 0x20 for debugging, 0x00 for reality */
+#define GLOBAL 0x00 /* 0x20 for debugging, 0x00 for reality */
 
 void getprefix(void)
 {
@@ -124,10 +124,11 @@ void getprefix(void)
           int i, j;
           int bits;
           memset(id6, 0, sizeof(id6));
+#if 0
           printf("IPv6: %s matched, scope = %d, %d bits prefix\n",
                  name, scope, preflen);
-
-          for(bits=preflen, i=0; bits>=0; bits-=8, i++) {
+#endif
+          for(bits=preflen, i=0; bits>0; bits-=8, i++) {
             char buf[3];
             long val;
             int mask;
