@@ -1,5 +1,4 @@
-#include <windows.h>
-#include <winsock.h>
+#include <winsock2.h>
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
@@ -167,10 +166,12 @@ static int getprefix(void)
       }
       free(buffer);
     }
-
+    else
+      return 2;
   }
   else
     return 1;
+  return 0;
 }
 
 int main(void)
