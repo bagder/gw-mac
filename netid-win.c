@@ -23,7 +23,7 @@ static BOOL macaddr(BYTE addr[], DWORD len, char str[])
   return TRUE;
 }
 
-static void arplist(char *gateway)
+static int arplist(char *gateway)
 {
   PMIB_IPNETTABLE pIpNetTable = NULL;
 
@@ -53,20 +53,21 @@ static void arplist(char *gateway)
 
         if(!strcmp(gateway, inet_ntoa(inadTmp))) {
           printf("id: %s\n", szPrintablePhysAddr);
-          break;
+          free(pIpNetTable);
+          return 0; /* success */
         }
 #if 0
         printf("  %-16s      %-17s\n",
                inet_ntoa(inadTmp), szPrintablePhysAddr);
 #endif
       }
-
       free(pIpNetTable);
     }
   }
   else {
     printf("general error\n");
   }
+  return 1; /* failure */
 }
 
 static int defaultgw(char *gateway) /* at least 128 bytes buffer */
@@ -130,21 +131,55 @@ static int defaultgw(char *gateway) /* at least 128 bytes buffer */
 #endif
     } /* for loop */
     free(pIpForwardTable);
-
   }
   else {
     printf("GetIpForwardTable failed.\n");
     free(pIpForwardTable);
+    return 1;
   }
 
   return 0;
 }
 
+static int getprefix(void)
+{
+  ULONG size = 0;
+
+  /* first ask for buffer size */
+  ULONG rc = GetAdaptersAddresses(AF_INET6,
+                                  GAA_FLAG_SKIP_MULTICAST|
+                                  GAA_FLAG_SKIP_FRIENDLY_NAME,
+                                  NULL, NULL, &size);
+
+  if(ERROR_BUFFER_OVERFLOW == rc) {
+    IP_ADAPTER_ADDRESSES *adpt = malloc(size);
+    IP_ADAPTER_ADDRESSES *buffer = adpt;
+    if(adpt) {
+      /* now ask for the addresses for real */
+      rc = GetAdaptersAddresses(AF_INET6,
+                                GAA_FLAG_SKIP_MULTICAST|
+                                GAA_FLAG_SKIP_FRIENDLY_NAME,
+                                NULL, adpt, &size);
+      while(adpt) {
+        printf("Name: %s\n", adpt->AdapterName);
+
+        adpt = adpt->Next;
+      }
+      free(buffer);
+    }
+
+  }
+  else
+    return 1;
+}
+
 int main(void)
 {
   char gateway[128];
-  defaultgw(gateway);
+  if(!defaultgw(gateway))
+    arplist(gateway);
 
-  arplist(gateway);
+  getprefix();
+
   return 0;
 }
