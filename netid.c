@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <inttypes.h>
 
 /* IPv4 routes */
@@ -80,6 +81,8 @@ uint32_t getroute(void)
   return gw;
 }
 
+#define GLOBAL 0x20 /* 0x20 for debugging, 0x00 for reality */
+
 void getprefix(void)
 {
   FILE *ifs = fopen(PROC_IF_INET6, "r");
@@ -116,7 +119,32 @@ void getprefix(void)
     while(l) {
       if(6 == sscanf(buffer, "%32[0-9a-f] %02x %02x %02x %02x %31s",
                      ip6, &devnum, &preflen, &scope, &flags, name)) {
-        printf("%s matched, scope = %d\n", name, scope);
+        if(scope == GLOBAL) {
+          unsigned char id6[33];
+          int i, j;
+          int bits;
+          memset(id6, 0, sizeof(id6));
+          printf("IPv6: %s matched, scope = %d, %d bits prefix\n",
+                 name, scope, preflen);
+
+          for(bits=preflen, i=0; bits>=0; bits-=8, i++) {
+            char buf[3];
+            long val;
+            int mask;
+            int maskit[]={0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff};
+            buf[0]=ip6[i*2];
+            buf[1]=ip6[i*2+1];
+            buf[2]=0;
+            /* convert from hex */
+            val = strtol(buf, NULL, 16);
+            mask = ( bits >= 8 ) ? 0xff : maskit[bits];
+            id6[i]=(unsigned char)val&mask;
+          }
+          printf("id6: ");
+          for(j=0; j<i; j++)
+            printf("%s%02x", j?":":"", id6[j]);
+          printf("\n");
+        }
       }
 
       l = fgets(buffer, sizeof(buffer), ifs);
