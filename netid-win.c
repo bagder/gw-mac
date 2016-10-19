@@ -160,7 +160,14 @@ static int getprefix(void)
                                 GAA_FLAG_SKIP_FRIENDLY_NAME,
                                 NULL, adpt, &size);
       while(adpt) {
+        IP_ADAPTER_UNICAST_ADDRESS *adr = adpt->FirstUnicastAddress;
         printf("Name: %s\n", adpt->AdapterName);
+        printf("Global zone index: %d\n", adpt->ZoneIndices[ScopeLevelGlobal]);
+
+        do {
+          printf("Prefix length: %d\n", adr->OnLinkPrefixLength);
+          adr = adr->Next;
+        } while(adr);
 
         adpt = adpt->Next;
       }
