@@ -1,4 +1,4 @@
-TARGET = netid
+TARGET = netid-win.exe
 
 OBJS = netid-win.obj
 
