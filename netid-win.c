@@ -163,27 +163,26 @@ static int getprefix(void)
                                 GAA_FLAG_SKIP_FRIENDLY_NAME,
                                 NULL, adpt, &size);
       while(adpt) {
-        IP_ADAPTER_UNICAST_ADDRESS *adr = adpt->FirstUnicastAddress;
         if(adpt->OperStatus == IfOperStatusUp) {
           char buffer[100];
-
           printf("Name: %s\n", (char *)adpt->AdapterName);
 #if 0
           printf("Flags: %x\n", adpt->Flags);
           printf("OperStatus: %x\n", adpt->OperStatus);
           printf("Global zone index: %d\n", adpt->ZoneIndices[ScopeLevelGlobal]);
 #endif
-          do {
-            LPSOCKADDR addr = adpt->FirstUnicastAddress->Address.lpSockaddr;
+          IP_ADAPTER_UNICAST_ADDRESS *ipadr = adpt->FirstUnicastAddress;
+          while(ipadr) {
+            LPSOCKADDR addr = ipadr->Address.lpSockaddr;
             struct sockaddr_in6 *sa_in6 = (struct sockaddr_in6 *)addr;
             int i;
             printf("Address: %s\n",
                    inet_ntop(AF_INET6, &(sa_in6->sin6_addr),
                              buffer, sizeof(buffer)));
-            printf("Prefix: %d bytes\n", adr->OnLinkPrefixLength);
-            adr = adr->Next;
-          } while(adr);
-
+            printf("Prefix: %d bits\n", ipadr->OnLinkPrefixLength);
+            ipadr = ipadr->Next;
+          }
+#if 0
           IP_ADAPTER_PREFIX *prefix = adpt->FirstPrefix;
           while(prefix) {
             struct sockaddr_in6 *sa_in6 = (struct sockaddr_in6 *)&prefix->Address;
@@ -192,9 +191,9 @@ static int getprefix(void)
             printf("Address: (%d bits) %s\n", prefix->PrefixLength,
                    inet_ntop(AF_INET6, &(sa_in6->sin6_addr),
                              buffer, sizeof(buffer)));
-            printf("Prefix: %d bytes\n", adr->OnLinkPrefixLength);
             prefix = prefix->Next;
           }
+#endif
         }
         adpt = adpt->Next;
       }
