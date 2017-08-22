@@ -10,6 +10,7 @@
 #include <netinet/if_ether.h>
 
 #include <arpa/inet.h>
+#include <ifaddrs.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -139,11 +140,69 @@ static void routingtable(char *gw)
   free(buf);
 }
 
+/* code inspired by mac osx's ifconfig:
+   https://opensource.apple.com/source/network_cmds/network_cmds-511/ifconfig.tproj/ifconfig.c.auto.html */
+static int
+prefix(void *val, int size)
+{
+  u_char *name = (u_char *)val;
+  int byte, bit, plen = 0;
+
+  for (byte = 0; byte < size; byte++, plen += 8)
+    if (name[byte] != 0xff)
+      break;
+  if (byte == size)
+    return (plen);
+  for (bit = 7; bit != 0; bit--, plen++)
+    if (!(name[byte] & (1 << bit)))
+      break;
+  for (; bit != 0; bit--)
+    if (name[byte] & (1 << bit))
+      return(0);
+  byte++;
+  for (; byte < size; byte++)
+    if (name[byte])
+      return(0);
+  return (plen);
+}
+
+static void ipv6prefixes(void)
+{
+  struct ifaddrs *ifap;
+  if (!getifaddrs(&ifap)) {
+    struct ifaddrs *ifa;
+    for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+      struct ifaddrs *ift;
+      for (ift = ifa; ift != NULL; ift = ift->ifa_next) {
+        if (ift->ifa_addr == NULL)
+          continue;
+        if (strcmp(ifa->ifa_name, ift->ifa_name) != 0)
+          continue;
+        if ((AF_INET6 == ift->ifa_addr->sa_family) &&
+            !(ifa->ifa_flags & (IFF_POINTOPOINT|IFF_LOOPBACK))) {
+          /* only go for IPv6 interface that isn't pointtopoint or loopback */
+          struct sockaddr_in6 *sin = (struct sockaddr_in6 *)ifa->ifa_netmask;
+          if (sin) {
+            char addr_buf[128];
+            struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+            inet_ntop(AF_INET6, &sin6->sin6_addr, addr_buf,
+                      sizeof(addr_buf));
+            printf("Name: %s (%s) ", ift->ifa_name, addr_buf);
+            printf("prefix %d\n", prefix(&sin->sin6_addr,
+                                         sizeof(struct in6_addr)));
+          }
+        }
+      }
+    }
+    freeifaddrs(ifap);
+  }
+}
+
 int main(void)
 {
   char defaultgw[MAXHOSTNAMELEN];
   routingtable(defaultgw);
   getarp(defaultgw);
-
+  ipv6prefixes();
   return 0;
 }
