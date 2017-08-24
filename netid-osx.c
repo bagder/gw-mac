@@ -51,7 +51,7 @@ static int show(struct sockaddr_dl *sdl,
 {
   if (sdl->sdl_alen) {
     if(!strcmp(inet_ntoa(addr->sin_addr), ip)) {
-      printf("id: %s\n", print_lladdr(sdl));
+      printf("IPv4 id: %s\n", print_lladdr(sdl));
       return 1; /* done! */
     }
   }
@@ -140,12 +140,64 @@ static void routingtable(char *gw)
   free(buf);
 }
 
+/* IPv6 address scopes. */
+#define IPV6_SCOPE_GLOBAL       0       /* Global scope. */
+#define IPV6_SCOPE_LINKLOCAL    1       /* Link-local scope. */
+#define IPV6_SCOPE_SITELOCAL    2       /* Site-local scope (deprecated). */
+#define IPV6_SCOPE_UNIQUELOCAL  3       /* Unique local */
+#define IPV6_SCOPE_NODELOCAL    4       /* Loopback. */
+
+static const char *scope2str(int scope)
+{
+  switch(scope) {
+  case IPV6_SCOPE_LINKLOCAL:
+    return "link-local";
+  case IPV6_SCOPE_SITELOCAL:
+    return "site-local";
+  case IPV6_SCOPE_UNIQUELOCAL:
+    return "unique-local";
+  case IPV6_SCOPE_NODELOCAL:
+    return "node-local";
+  default:
+    return "global";
+  }
+}
+
+
+/* Return the scope of the given address. */
+static int ipv6_scope(const struct sockaddr_in6 *sa6)
+{
+  if(sa6->sin6_family == AF_INET6) {
+    const unsigned char *b = sa6->sin6_addr.s6_addr;
+    unsigned short w = (unsigned short) ((b[0] << 8) | b[1]);
+
+    if((b[0] & 0xFE) == 0xFC) /* Handle ULAs */
+      return IPV6_SCOPE_UNIQUELOCAL;
+    switch(w & 0xFFC0) {
+    case 0xFE80:
+      return IPV6_SCOPE_LINKLOCAL;
+    case 0xFEC0:
+      return IPV6_SCOPE_SITELOCAL;
+    case 0x0000:
+      w = b[1] | b[2] | b[3] | b[4] | b[5] | b[6] | b[7] | b[8] | b[9] |
+        b[10] | b[11] | b[12] | b[13] | b[14];
+      if(w || b[15] != 0x01)
+        break;
+      return IPV6_SCOPE_NODELOCAL;
+    default:
+      break;
+    }
+  }
+
+  return IPV6_SCOPE_GLOBAL;
+}
+
 /* code inspired by mac osx's ifconfig:
    https://opensource.apple.com/source/network_cmds/network_cmds-511/ifconfig.tproj/ifconfig.c.auto.html */
 static int
-prefix(void *val, int size)
+ipv6_prefix(void *val, int size)
 {
-  u_char *name = (u_char *)val;
+  unsigned char *name = (unsigned char *)val;
   int byte, bit, plen = 0;
 
   for (byte = 0; byte < size; byte++, plen += 8)
@@ -166,35 +218,50 @@ prefix(void *val, int size)
   return (plen);
 }
 
-static void ipv6prefixes(void)
+static void ipv6netid(void)
 {
   struct ifaddrs *ifap;
+  int gl = 0;
   if (!getifaddrs(&ifap)) {
     struct ifaddrs *ifa;
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-      struct ifaddrs *ift;
-      for (ift = ifa; ift != NULL; ift = ift->ifa_next) {
-        if (ift->ifa_addr == NULL)
-          continue;
-        if (strcmp(ifa->ifa_name, ift->ifa_name) != 0)
-          continue;
-        if ((AF_INET6 == ift->ifa_addr->sa_family) &&
-            !(ifa->ifa_flags & (IFF_POINTOPOINT|IFF_LOOPBACK))) {
-          /* only go for IPv6 interface that isn't pointtopoint or loopback */
-          struct sockaddr_in6 *sin = (struct sockaddr_in6 *)ifa->ifa_netmask;
-          if (sin) {
-            char addr_buf[128];
-            struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+      if (ifa->ifa_addr == NULL)
+        continue;
+      if ((AF_INET6 == ifa->ifa_addr->sa_family) &&
+          !(ifa->ifa_flags & (IFF_POINTOPOINT|IFF_LOOPBACK))) {
+        /* only IPv6 interfaces that aren't pointtopoint or loopback */
+        struct sockaddr_in6 *sin = (struct sockaddr_in6 *)ifa->ifa_netmask;
+        if (sin) {
+          char addr_buf[128];
+          int scope;
+          struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+          scope = ipv6_scope(sin6);
+          if(scope == IPV6_SCOPE_GLOBAL) {
+            /* only global scope */
+            int prefix;
             inet_ntop(AF_INET6, &sin6->sin6_addr, addr_buf,
                       sizeof(addr_buf));
-            printf("Name: %s (%s) ", ift->ifa_name, addr_buf);
-            printf("prefix %d\n", prefix(&sin->sin6_addr,
-                                         sizeof(struct in6_addr)));
+            prefix = ipv6_prefix(&sin->sin6_addr, sizeof(struct in6_addr));
+            if(prefix && (prefix  < 128)) {
+              unsigned char *p = (unsigned char *)&sin6->sin6_addr;
+              int i;
+              /* a non-zero prefix that is smaller than 128 */
+              printf("Name: %s %s (%s)\n", ifa->ifa_name, scope2str(scope), addr_buf);
+              printf("  prefix %d bits:", prefix);
+              for(i=0; i<prefix/8; i++, p++) {
+                printf(" %02x", *p);
+              }
+              puts("");
+              gl++;
+            }
           }
         }
       }
     }
     freeifaddrs(ifap);
+  }
+  if(!gl) {
+    printf("No IPv6 netid found\n");
   }
 }
 
@@ -203,6 +270,6 @@ int main(void)
   char defaultgw[MAXHOSTNAMELEN];
   routingtable(defaultgw);
   getarp(defaultgw);
-  ipv6prefixes();
+  ipv6netid();
   return 0;
 }
