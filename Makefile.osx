@@ -1,6 +1,6 @@
 TARGET = netid-osx
 
-CFLAGS = -Wall
+CFLAGS = -Wall -g
 
 OBJS = netid-osx.o
 
