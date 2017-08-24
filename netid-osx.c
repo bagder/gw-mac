@@ -51,7 +51,7 @@ static int show(struct sockaddr_dl *sdl,
 {
   if (sdl->sdl_alen) {
     if(!strcmp(inet_ntoa(addr->sin_addr), ip)) {
-      printf("IPv4 id: %s\n", print_lladdr(sdl));
+      printf("id: %s\n", print_lladdr(sdl));
       return 1; /* done! */
     }
   }
@@ -147,6 +147,7 @@ static void routingtable(char *gw)
 #define IPV6_SCOPE_UNIQUELOCAL  3       /* Unique local */
 #define IPV6_SCOPE_NODELOCAL    4       /* Loopback. */
 
+#if 0
 static const char *scope2str(int scope)
 {
   switch(scope) {
@@ -162,7 +163,7 @@ static const char *scope2str(int scope)
     return "global";
   }
 }
-
+#endif
 
 /* Return the scope of the given address. */
 static int ipv6_scope(const struct sockaddr_in6 *sa6)
@@ -218,10 +219,15 @@ ipv6_prefix(void *val, int size)
   return (plen);
 }
 
+#define MAX_PRFS 8
+
 static void ipv6netid(void)
 {
   struct ifaddrs *ifap;
+  struct in6_addr pr[MAX_PRFS];
   int gl = 0;
+
+  memset(pr, 0, sizeof(pr));
   if (!getifaddrs(&ifap)) {
     struct ifaddrs *ifa;
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -245,14 +251,34 @@ static void ipv6netid(void)
             if(prefix && (prefix  < 128)) {
               unsigned char *p = (unsigned char *)&sin6->sin6_addr;
               int i;
+              int match = 0;
+#if 0
               /* a non-zero prefix that is smaller than 128 */
               printf("Name: %s %s (%s)\n", ifa->ifa_name, scope2str(scope), addr_buf);
               printf("  prefix %d bits:", prefix);
+#endif
+              /* check if prefix was already found */
+              for(i=0; i<gl; i++) {
+                if(!memcmp(&pr[i], p, prefix/8)) {
+                  /* a match */
+                  match = 1;
+                  break;
+                }
+              }
+              if(match)
+                /* already found */
+                continue;
+              memcpy(&pr[gl], p, prefix/8);
+              printf("id6: ");
               for(i=0; i<prefix/8; i++, p++) {
-                printf(" %02x", *p);
+                printf("%s%02x", i?":":"", *p);
               }
               puts("");
               gl++;
+              if(gl == MAX_PRFS) {
+                /* reach maximum number of prefixes */
+                break;
+              }
             }
           }
         }
